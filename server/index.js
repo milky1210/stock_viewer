@@ -13,7 +13,17 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY; // Note: Env var name change slightly or mapping required
+
+// Support multiple API keys (comma separated) to rotate and extend limits
+const API_KEYS = (process.env.ALPHA_VANTAGE_API_KEY || '').split(',').map(k => k.trim()).filter(k => k);
+let currentKeyIndex = 0;
+
+const getNextApiKey = () => {
+    if (API_KEYS.length === 0) return null;
+    const key = API_KEYS[currentKeyIndex];
+    currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+    return key;
+};
 
 app.use(cors());
 app.use(express.json());
@@ -63,7 +73,9 @@ app.get('/api/quote', async (req, res) => {
         console.log(`Cache expired for ${upperSymbol}`);
     }
 
-    if (!ALPHA_VANTAGE_API_KEY || ALPHA_VANTAGE_API_KEY === 'YOUR_API_KEY_HERE') {
+    const apiKey = getNextApiKey();
+
+    if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
          // Mock response if no key configured on server
          console.log("No API Key configured, returning mock data");
          // Reuse the mock logic from frontend roughly? Or just error?
@@ -76,12 +88,12 @@ app.get('/api/quote', async (req, res) => {
 
     // Fetch from API
     try {
-        console.log(`Fetching ${upperSymbol} from Alpha Vantage...`);
+        console.log(`Fetching ${upperSymbol} from Alpha Vantage using key index ${(currentKeyIndex - 1 + API_KEYS.length) % API_KEYS.length}...`);
         const response = await axios.get('https://www.alphavantage.co/query', {
             params: {
                 function: 'GLOBAL_QUOTE',
                 symbol: upperSymbol,
-                apikey: ALPHA_VANTAGE_API_KEY
+                apikey: apiKey
             }
         });
 
