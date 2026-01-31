@@ -32,7 +32,7 @@ const PRESETS = [
 
 function App() {
   const [stocks, setStocks] = useLocalStorage<Stock[]>('portfolio', []);
-  const [apiKey, setApiKey] = useLocalStorage<string>('apiKey', '');
+  const [apiKey, setApiKey] = useLocalStorage<string>('apiKey', import.meta.env.VITE_ALPHA_VANTAGE_API_KEY || '');
   const [baseCurrency, setBaseCurrency] = useLocalStorage<'USD' | 'JPY'>('baseCurrency', 'JPY');
   const [exchangeRate, setExchangeRate] = useLocalStorage<number>('usdJpyRate', 150);
 
