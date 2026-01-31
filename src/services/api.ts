@@ -24,6 +24,7 @@ function getRandomMockData(symbol: string): StockData {
       ...base,
       price: base.price + noise,
       changePercent: base.changePercent + (noise / 10),
+      isMock: true,
     };
   }
   return {
@@ -32,6 +33,7 @@ function getRandomMockData(symbol: string): StockData {
     changePercent: (Math.random() - 0.5) * 5,
     previousClose: 100,
     sector: 'Unknown',
+    isMock: true,
   };
 }
 

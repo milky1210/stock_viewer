@@ -14,6 +14,7 @@ export interface StockData {
   previousClose: number;
   sector?: string;
   currency?: string; 
+  isMock?: boolean;
 }
 
 export interface PortfolioItem extends Stock {
@@ -25,6 +26,7 @@ export interface PortfolioItem extends Stock {
   dayChangePercent?: number; 
   sector?: string;
   previousClose?: number;
+  isMock?: boolean;
 }
 
 export interface Summary {

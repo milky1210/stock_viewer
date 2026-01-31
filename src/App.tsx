@@ -194,10 +194,14 @@ function App() {
     });
   };
 
+  const isMockData = useMemo(() => {
+    return portfolioData.some(item => item.isMock);
+  }, [portfolioData]);
+
   return (
     <div className="container">
       <header className="header">
-        <h1>Stock Viewer</h1>
+        <h1>Stock Viewer {isMockData && <span className="mock-badge">(Demo Data)</span>}</h1>
         <div className="header-controls">
             <div className="currency-toggle">
                 <button 
