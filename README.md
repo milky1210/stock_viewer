@@ -1,73 +1,63 @@
-# React + TypeScript + Vite
+# Stock Viewer (資産管理ビューアー)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+保有している株式や投資信託（ETFプロキシ）の数量を入力することで、現在の資産評価額と前日比の増減を一目で確認できるWebアプリケーションです。
 
-Currently, two official plugins are available:
+## 特徴
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+*   **簡単なポートフォリオ管理**: 主要な指数や個別株のシンボルを入力するだけで追跡可能。
+*   **マルチ通貨対応**: USD/JPYの切り替え表示、および資産ごとの通貨設定が可能。
+*   **バックエンドキャッシュ**: サーバー側で株価データをキャッシュ（1時間）し、API利用制限を回避しながら効率的に運用。
+*   **プライバシー**: 保有数などの個人データはブラウザ（LocalStorage）にのみ保存され、サーバーには送信されません（※株価取得のためのシンボルのみ送信されます）。
 
-## React Compiler
+## 推奨動作環境
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+*   Docker および Docker Compose がインストールされているサーバー
+*   Alpha Vantage の API Key（無料）
 
-## Expanding the ESLint configuration
+## セットアップ手順
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 1. リポジトリの取得
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+git clone https://github.com/milky1210/stock_viewer.git
+cd stock_viewer
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. 環境変数の設定
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Alpha VantageのAPIキーを設定します。
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.sample .env
+vi .env
+# VITE_ALPHA_VANTAGE_API_KEY=あなたのAPIキー を入力
 ```
+
+> APIキーは [Alpha Vantage公式サイト](https://www.alphavantage.co/support/#api-key) から無料で取得できます。
+
+### 3. アプリケーションの起動
+
+Docker Composeを使用して、フロントエンドとバックエンドサーバーを一括で起動します。
+
+```bash
+docker compose up -d --build
+```
+
+起動後、ブラウザで `http://localhost:8080` （またはサーバーのIPアドレス:8080）にアクセスしてください。
+
+### 4. 停止
+
+```bash
+docker compose down
+```
+
+## アーキテクチャ
+
+*   **Frontend**: React (Vite), Recharts (グラフ), TypeScript
+*   **Backend**: Node.js (Express) - APIプロキシおよびキャッシュ担当
+*   **Infrastructure**: Nginx (Webサーバー), Docker Compose
+
+## 注意事項
+
+*   投資信託（eMAXIS Slim等）のデータは、連動する米国ETF（ACWI, VOO等）のデータを代用して表示しています。
+*   無料APIプランの制限（1日25回等）を考慮し、サーバー側でデータを1時間キャッシュします。頻繁に新しい銘柄を追加すると制限に達する可能性があります。

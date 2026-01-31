@@ -3,6 +3,15 @@ services:
     build: .
     ports:
       - "8080:80"
+    restart: always
+    depends_on:
+      - server
+
+  server:
+    build: ./server
     env_file:
       - .env
+    volumes:
+      - ./server/cache.json:/app/cache.json
     restart: always
+

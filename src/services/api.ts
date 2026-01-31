@@ -1,6 +1,6 @@
 import type { StockData } from '../types';
 
-const ALPHA_VANTAGE_BASE = 'https://www.alphavantage.co/query';
+const API_BASE = '/api/quote'; 
 
 // Mock Data for Demo Mode
 const MOCK_DB: Record<string, StockData> = {
@@ -18,7 +18,6 @@ const MOCK_DB: Record<string, StockData> = {
 
 function getRandomMockData(symbol: string): StockData {
   if (MOCK_DB[symbol]) {
-    // Add some random noise to make it feel alive if reloaded
     const noise = (Math.random() - 0.5) * 2;
     const base = MOCK_DB[symbol];
     return {
@@ -36,47 +35,37 @@ function getRandomMockData(symbol: string): StockData {
   };
 }
 
-// Alpha Vantage Free Tier: 5 calls / minute. 
-// We need to be careful.
-export async function fetchStockData(symbol: string, apiKey: string): Promise<StockData> {
-  if (!apiKey || apiKey === 'DEMO') {
+// Now calls our own Backend
+export async function fetchStockData(symbol: string, apiKey?: string): Promise<StockData> {
+  // If explicitly "DEMO", usage Mock. 
+  // In frontend UI, user can still type "DEMO" to force mock mode.
+  if (apiKey === 'DEMO') {
     return new Promise((resolve) => {
       setTimeout(() => resolve(getRandomMockData(symbol.toUpperCase())), 500);
     });
   }
 
   try {
-    const response = await fetch(`${ALPHA_VANTAGE_BASE}?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`);
-    const data = await response.json();
-
-    if (data['Note'] || data['Information']) {
-       // Rate limit hit or API error, fallback/throw
-       throw new Error(data['Note'] || 'API Limit Reached');
-    }
-
-    const quote = data['Global Quote'];
-    if (!quote || Object.keys(quote).length === 0) {
-      throw new Error(`Symbol ${symbol} not found`);
-    }
-
-    const price = parseFloat(quote['05. price']);
-    const previousClose = parseFloat(quote['08. previous close']);
-    const changePercent = parseFloat(quote['10. change percent'].replace('%', ''));
-
-    // Alpha Vantage Global Quote doesn't return Sector. 
-    // We would need 'OVERVIEW' endpoint for that, but that consumes more quota.
-    // For this simplified app, we might need manual sector input or guess.
+    // Call our server proxy
+    const response = await fetch(`${API_BASE}?symbol=${symbol}`);
     
+    if (!response.ok) {
+       const errJson = await response.json().catch(() => ({}));
+       console.warn("Backend Error:", errJson);
+       throw new Error(errJson.error || 'Server Error');
+    }
+
+    const data = await response.json();
     return {
-      symbol: quote['01. symbol'],
-      price,
-      changePercent,
-      previousClose,
-      sector: 'Unknown' // Default
+      symbol: data.symbol,
+      price: data.price,
+      changePercent: data.changePercent,
+      previousClose: data.previousClose,
+      sector: 'Unknown' 
     };
   } catch (error) {
-    console.error("Fetch error", error);
-    // Fallback to mock if it fails? No, better to alert user.
-    throw error;
+    console.warn("Backend fetch failed, falling back to Mock/Demo data logic.", error);
+    // Fallback: If backend is down or 404 (GitHub Pages), use Mock
+    return getRandomMockData(symbol.toUpperCase());
   }
 }
