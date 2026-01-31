@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { Plus, Trash2, RefreshCw, Settings, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Settings } from 'lucide-react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { fetchStockData } from './services/api';
 import { Stock, PortfolioItem, Summary, SectorAlloc } from './types';
@@ -24,6 +24,9 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 function App() {
   const [stocks, setStocks] = useLocalStorage<Stock[]>('portfolio', []);
   const [apiKey, setApiKey] = useLocalStorage<string>('apiKey', '');
+  const [baseCurrency, setBaseCurrency] = useLocalStorage<'USD' | 'JPY'>('baseCurrency', 'JPY');
+  const [exchangeRate, setExchangeRate] = useLocalStorage<number>('usdJpyRate', 150);
+
   const [portfolioData, setPortfolioData] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +35,7 @@ function App() {
   const [symbol, setSymbol] = useState('');
   const [qty, setQty] = useState('');
   const [userSector, setUserSector] = useState('');
+  const [stockCurrency, setStockCurrency] = useState<'USD' | 'JPY'>('USD');
   const [showSettings, setShowSettings] = useState(false);
 
   // Fetch Data
@@ -43,16 +47,28 @@ function App() {
         try {
           const marketData = await fetchStockData(stock.symbol, apiKey);
           
-          // Fallback to user defined sector if API returns Unknown
           const finalSector = marketData.sector === 'Unknown' && stock.userSector 
             ? stock.userSector 
             : marketData.sector;
 
-          // Calculate values
+          // Native values
           const currentPrice = marketData.price;
           const value = currentPrice * stock.quantity;
           const dayChangeValue = (currentPrice - marketData.previousClose) * stock.quantity;
           const dayChangePercent = marketData.changePercent;
+
+          // Conversion
+          const itemCurrency = stock.currency || 'USD';
+          let rate = 1;
+          
+          if (baseCurrency === 'JPY' && itemCurrency === 'USD') {
+             rate = exchangeRate;
+          } else if (baseCurrency === 'USD' && itemCurrency === 'JPY') {
+             rate = 1 / exchangeRate;
+          }
+
+          const valueInBaseCurrency = value * rate;
+          const dayChangeValueInBaseCurrency = dayChangeValue * rate;
 
           return {
             ...stock,
@@ -60,17 +76,20 @@ function App() {
             sector: finalSector,
             currentPrice,
             value,
+            valueInBaseCurrency,
             dayChangeValue,
+            dayChangeValueInBaseCurrency,
             dayChangePercent
           } as PortfolioItem;
         } catch (err) {
             console.error(`Failed to load ${stock.symbol}`, err);
-            // Return item with placeholders on error
             return {
                 ...stock,
-                currentPrice: 0, // Indicate error visually?
+                currentPrice: 0,
                 value: 0,
+                valueInBaseCurrency: 0,
                 dayChangeValue: 0,
+                dayChangeValueInBaseCurrency: 0,
                 dayChangePercent: 0,
                 sector: stock.userSector || 'Unknown',
                 price: 0,
@@ -90,12 +109,11 @@ function App() {
     }
   };
 
-  // Initial load
   useEffect(() => {
     if (stocks.length > 0) {
       refreshData();
     }
-  }, [stocks.length]); 
+  }, [stocks.length, baseCurrency, exchangeRate]); 
 
   const handleAddStock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +122,8 @@ function App() {
       id: crypto.randomUUID(),
       symbol: symbol.toUpperCase(),
       quantity: parseFloat(qty),
-      userSector: userSector || 'Other'
+      userSector: userSector || 'Other',
+      currency: stockCurrency
     };
     setStocks([...stocks, newStock]);
     setSymbol('');
@@ -120,9 +139,10 @@ function App() {
   // Derived Calculations
   const summary: Summary = useMemo(() => {
     return portfolioData.reduce((acc, item) => ({
-      totalValue: acc.totalValue + (item.value || 0),
-      totalDayChangeValue: acc.totalDayChangeValue + (item.dayChangeValue || 0),
-      totalDayChangePercent: 0 
+      totalValue: acc.totalValue + (item.valueInBaseCurrency || 0),
+      totalDayChangeValue: acc.totalDayChangeValue + (item.dayChangeValueInBaseCurrency || 0),
+      // Aggregate percent change is calculated from totals, not summed
+      totalDayChangePercent: 0
     }), { totalValue: 0, totalDayChangeValue: 0, totalDayChangePercent: 0 });
   }, [portfolioData]);
 
@@ -135,19 +155,38 @@ function App() {
     const map = new Map<string, number>();
     portfolioData.forEach(item => {
       const sec = item.sector || 'Unknown';
-      const val = item.value || 0;
+      const val = item.valueInBaseCurrency || 0;
       map.set(sec, (map.get(sec) || 0) + val);
     });
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
   }, [portfolioData]);
 
+  const formatCurrency = (val: number) => {
+    return val.toLocaleString(undefined, { 
+      style: 'currency', 
+      currency: baseCurrency 
+    });
+  };
+
   return (
     <div className="container">
       <header className="header">
         <h1>Stock Viewer</h1>
-        <button onClick={() => setShowSettings(!showSettings)} className="icon-btn">
-          <Settings size={20} />
-        </button>
+        <div className="header-controls">
+            <div className="currency-toggle">
+                <button 
+                    className={baseCurrency === 'USD' ? 'active' : ''} 
+                    onClick={() => setBaseCurrency('USD')}
+                >USD</button>
+                <button 
+                    className={baseCurrency === 'JPY' ? 'active' : ''} 
+                    onClick={() => setBaseCurrency('JPY')}
+                >JPY</button>
+            </div>
+            <button onClick={() => setShowSettings(!showSettings)} className="icon-btn">
+                <Settings size={20} />
+            </button>
+        </div>
       </header>
       
       {showSettings && (
@@ -160,8 +199,15 @@ function App() {
              placeholder="Enter API Key"
              className="input-field"
            />
+           <label>USD/JPY Exchange Rate (Manual)</label>
+            <input 
+             type="number"
+             value={exchangeRate} 
+             onChange={(e) => setExchangeRate(parseFloat(e.target.value))} 
+             className="input-field"
+           />
            <p className="hint">
-             Note: Free keys allow 5 calls/min. "DEMO" mode uses random cached data.
+             Note: Free keys allow 5 calls/min.
            </p>
         </div>
       )}
@@ -169,15 +215,15 @@ function App() {
       {/* Summary Cards */}
       <div className="summary-grid">
         <div className="card summary-card">
-           <div className="label">Total Valuation</div>
-           <div className="value large">${summary.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+           <div className="label">Total Valuation ({baseCurrency})</div>
+           <div className="value large">{formatCurrency(summary.totalValue)}</div>
         </div>
         <div className={`card summary-card ${summary.totalDayChangeValue >= 0 ? 'positive' : 'negative'}`}>
            <div className="label">Day Change</div>
            <div className="value-group">
               <span className="value">
                  {summary.totalDayChangeValue >= 0 ? '+' : ''}
-                 ${summary.totalDayChangeValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                 {formatCurrency(summary.totalDayChangeValue)}
               </span>
               <span className="percent">
                  ({portfolioChangePercent.toFixed(2)}%)
@@ -201,6 +247,13 @@ function App() {
                             type="number" value={qty} onChange={e => setQty(e.target.value)} 
                             placeholder="Quantity" required className="input-field"
                         />
+                         <select 
+                            value={stockCurrency} onChange={e => setStockCurrency(e.target.value as any)} 
+                            className="input-field" style={{maxWidth: '80px'}}
+                        >
+                             <option value="USD">USD</option>
+                             <option value="JPY">JPY</option>
+                        </select>
                         <select 
                             value={userSector} onChange={e => setUserSector(e.target.value)} 
                             className="input-field"
@@ -233,12 +286,14 @@ function App() {
                         <div key={stock.id} className="stock-item">
                             <div className="stock-info">
                                 <span className="stock-symbol">{stock.symbol}</span>
-                                <span className="stock-qty">{stock.quantity} shares</span>
+                                <span className="stock-qty">{stock.quantity} shares ({stock.currency || 'USD'})</span>
                                 <span className="stock-sector text-muted">{stock.sector}</span>
                             </div>
                             <div className="stock-values">
-                                <div className="current-val">${(stock.value || 0).toLocaleString()}</div>
-                                <div className={`day-change ${(stock.dayChangeValue || 0) >= 0 ? 'green' : 'red'}`}>
+                                <div className="current-val">
+                                     {formatCurrency(stock.valueInBaseCurrency || 0)}
+                                </div>
+                                <div className={`day-change ${(stock.dayChangeValueInBaseCurrency || 0) >= 0 ? 'green' : 'red'}`}>
                                     {(stock.dayChangePercent || 0).toFixed(2)}%
                                 </div>
                             </div>
@@ -254,7 +309,7 @@ function App() {
         {/* Right Column: Charts */}
         <div className="column">
             <div className="card chart-card">
-                <h3>Sector Allocation</h3>
+                <h3>Sector Allocation ({baseCurrency})</h3>
                 <div style={{ width: '100%', height: 300 }}>
                     <ResponsiveContainer>
                         <PieChart>
@@ -272,7 +327,7 @@ function App() {
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
                             <Legend />
                         </PieChart>
                     </ResponsiveContainer>

@@ -4,6 +4,7 @@ export interface Stock {
   quantity: number;
   purchasePrice?: number; // Optional, for calculating simple P/L if needed (though user asked for total value)
   userSector?: string; // User defined sector if API fails or override
+  currency?: 'USD' | 'JPY'; // currency of the asset
 }
 
 export interface StockData {
@@ -12,12 +13,15 @@ export interface StockData {
   changePercent: number; // Daily change percentage
   previousClose: number;
   sector?: string;
+  currency?: string; 
 }
 
 export interface PortfolioItem extends Stock {
   currentPrice?: number;
-  value?: number; // quantity * currentPrice
-  dayChangeValue?: number; // (currentPrice - previousClose) * quantity
+  value?: number; // quantity * currentPrice (in native currency)
+  valueInBaseCurrency?: number; // Converted value
+  dayChangeValue?: number; 
+  dayChangeValueInBaseCurrency?: number;
   dayChangePercent?: number; 
   sector?: string;
   previousClose?: number;
