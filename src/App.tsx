@@ -21,6 +21,15 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
+const PRESETS = [
+  { id: 'ACWI', name: '全世界株式 (ACWI)', symbol: 'ACWI', sector: 'Global', currency: 'USD' as const },
+  { id: 'SP500', name: 'S&P 500 (VOO)', symbol: 'VOO', sector: 'US Market', currency: 'USD' as const },
+  { id: 'NAS100', name: 'NASDAQ 100 (QQQ)', symbol: 'QQQ', sector: 'Technology', currency: 'USD' as const },
+  { id: 'FANG', name: 'FANG+ (FNGS)', symbol: 'FNGS', sector: 'Technology', currency: 'USD' as const },
+  { id: 'SOX', name: 'SOX指数 (SOXX)', symbol: 'SOXX', sector: 'Technology', currency: 'USD' as const },
+  { id: 'NIKKEI', name: '日経平均 (EWJ)', symbol: 'EWJ', sector: 'Japan', currency: 'USD' as const },
+];
+
 function App() {
   const [stocks, setStocks] = useLocalStorage<Stock[]>('portfolio', []);
   const [apiKey, setApiKey] = useLocalStorage<string>('apiKey', '');
@@ -32,6 +41,8 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 
   // Form State
+  const [inputType, setInputType] = useState<'preset' | 'custom'>('preset');
+  const [selectedPreset, setSelectedPreset] = useState(PRESETS[0].id);
   const [symbol, setSymbol] = useState('');
   const [qty, setQty] = useState('');
   const [userSector, setUserSector] = useState('');
@@ -117,13 +128,28 @@ function App() {
 
   const handleAddStock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!symbol || !qty) return;
+    
+    let targetSymbol = symbol;
+    let targetSector = userSector || 'Other';
+    let targetCurrency = stockCurrency;
+
+    if (inputType === 'preset') {
+       const preset = PRESETS.find(p => p.id === selectedPreset);
+       if (preset) {
+           targetSymbol = preset.symbol;
+           targetSector = preset.sector;
+           targetCurrency = preset.currency;
+       }
+    }
+
+    if (!targetSymbol || !qty) return;
+
     const newStock: Stock = {
       id: crypto.randomUUID(),
-      symbol: symbol.toUpperCase(),
+      symbol: targetSymbol.toUpperCase(),
       quantity: parseFloat(qty),
-      userSector: userSector || 'Other',
-      currency: stockCurrency
+      userSector: targetSector,
+      currency: targetCurrency
     };
     setStocks([...stocks, newStock]);
     setSymbol('');
@@ -239,35 +265,64 @@ function App() {
         <div className="column">
             <div className="card">
                 <h3>Add Holding</h3>
+                <div style={{display: 'flex', gap: '1rem', marginBottom: '1rem'}}>
+                    <label>
+                        <input type="radio" checked={inputType === 'preset'} onChange={() => setInputType('preset')} /> 
+                        Investment Trust / Index
+                    </label>
+                    <label>
+                        <input type="radio" checked={inputType === 'custom'} onChange={() => setInputType('custom')} /> 
+                        Custom Stock
+                    </label>
+                </div>
+
                 <form onSubmit={handleAddStock} className="add-form">
                     <div className="form-group">
-                        <input 
+                        {inputType === 'preset' ? (
+                            <select 
+                                value={selectedPreset} 
+                                onChange={(e) => setSelectedPreset(e.target.value)}
+                                className="input-field"
+                            >
+                                {PRESETS.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                        ) : (
+                           <input 
                             value={symbol} onChange={e => setSymbol(e.target.value)} 
-                            placeholder="Symbol (e.g. AAPL)" required className="input-field"
-                        />
+                            placeholder="Symbol (e.g. AAPL)" required={inputType === 'custom'} className="input-field"
+                           />
+                        )}
+
                         <input 
                             type="number" value={qty} onChange={e => setQty(e.target.value)} 
-                            placeholder="Quantity" required className="input-field"
+                            placeholder="Quantity (Shares)" required className="input-field"
                         />
-                         <select 
-                            value={stockCurrency} onChange={e => setStockCurrency(e.target.value as any)} 
-                            className="input-field" style={{maxWidth: '80px'}}
-                        >
-                             <option value="USD">USD</option>
-                             <option value="JPY">JPY</option>
-                        </select>
-                        <select 
-                            value={userSector} onChange={e => setUserSector(e.target.value)} 
-                            className="input-field"
-                        >
-                             <option value="">Select Sector (Optional)</option>
-                             <option value="Technology">Technology</option>
-                             <option value="Financial">Financial</option>
-                             <option value="Healthcare">Healthcare</option>
-                             <option value="Consumer">Consumer</option>
-                             <option value="Energy">Energy</option>
-                             <option value="Index">Index/ETF</option>
-                        </select>
+                        
+                        {inputType === 'custom' && (
+                          <>
+                            <select 
+                                value={stockCurrency} onChange={e => setStockCurrency(e.target.value as any)} 
+                                className="input-field" style={{maxWidth: '80px'}}
+                            >
+                                <option value="USD">USD</option>
+                                <option value="JPY">JPY</option>
+                            </select>
+                            <select 
+                                value={userSector} onChange={e => setUserSector(e.target.value)} 
+                                className="input-field"
+                            >
+                                <option value="">Select Sector (Optional)</option>
+                                <option value="Technology">Technology</option>
+                                <option value="Financial">Financial</option>
+                                <option value="Healthcare">Healthcare</option>
+                                <option value="Consumer">Consumer</option>
+                                <option value="Energy">Energy</option>
+                                <option value="Index">Index/ETF</option>
+                            </select>
+                          </>
+                        )}
                     </div>
                     <button type="submit" className="btn-primary">
                         <Plus size={16} /> Add
