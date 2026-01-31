@@ -13,8 +13,13 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@types/uuid": "^10.0.0",
+    "gh-pages": "^6.3.0",
+    "lucide-react": "^0.563.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "recharts": "^3.7.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

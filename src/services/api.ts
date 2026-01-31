@@ -1,4 +1,4 @@
-import { StockData } from '../types';
+import type { StockData } from '../types';
 
 const ALPHA_VANTAGE_BASE = 'https://www.alphavantage.co/query';
 

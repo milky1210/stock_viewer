@@ -3,7 +3,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { Plus, Trash2, RefreshCw, Settings } from 'lucide-react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { fetchStockData } from './services/api';
-import { Stock, PortfolioItem, Summary, SectorAlloc } from './types';
+import type { Stock, PortfolioItem, Summary, SectorAlloc } from './types';
 import './App.css';
 
 const RADIAN = Math.PI / 180;
@@ -189,6 +189,8 @@ function App() {
         </div>
       </header>
       
+      {error && <div style={{color: 'red', marginBottom: '1rem'}}>{error}</div>}
+
       {showSettings && (
         <div className="card settings-card">
            <h3>Settings</h3>
@@ -323,11 +325,11 @@ function App() {
                                 fill="#8884d8"
                                 dataKey="value"
                             >
-                                {sectorData.map((entry, index) => (
+                                {sectorData.map((_entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
                             <Legend />
                         </PieChart>
                     </ResponsiveContainer>
